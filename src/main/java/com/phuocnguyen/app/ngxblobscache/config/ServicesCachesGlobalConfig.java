@@ -10,7 +10,7 @@ import javax.annotation.Resource;
 
 @SuppressWarnings("All")
 @Configuration
-public class ServicesGlobalConfig {
+public class ServicesCachesGlobalConfig {
 
     @Bean
     @Primary
