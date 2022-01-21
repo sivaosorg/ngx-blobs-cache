@@ -2,6 +2,9 @@ package com.phuocnguyen.app.ngxblobscache.config;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.EnableCaching;
@@ -89,12 +92,20 @@ public class RedisConfig {
         Jackson2JsonRedisSerializer<Object> jackson2JsonRedisSerializer = new Jackson2JsonRedisSerializer<>(Object.class);
         RedisTemplate<String, Object> objectRedisTemplate = new RedisTemplate<>();
         RedisSerializer<String> stringSerializer = new StringRedisSerializer();
-        ObjectMapper objectMapper = new ObjectMapper();
+
+        JsonFactory jsonFactory = new JsonFactory();
+        jsonFactory.enable(JsonParser.Feature.ALLOW_SINGLE_QUOTES);
+        ObjectMapper mapper = new ObjectMapper(jsonFactory);
+
         objectRedisTemplate.setConnectionFactory(jeDisConnectionFactory());
         objectRedisTemplate.setKeySerializer(stringSerializer);
         objectRedisTemplate.setHashKeySerializer(stringSerializer);
-        objectMapper.setVisibility(PropertyAccessor.ALL, JsonAutoDetect.Visibility.ANY);
-        jackson2JsonRedisSerializer.setObjectMapper(objectMapper);
+
+        mapper.setVisibility(PropertyAccessor.ALL, JsonAutoDetect.Visibility.ANY);
+        mapper.enableDefaultTyping(ObjectMapper.DefaultTyping.NON_FINAL);
+        mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+
+        jackson2JsonRedisSerializer.setObjectMapper(mapper);
         objectRedisTemplate.setValueSerializer(jackson2JsonRedisSerializer);
         objectRedisTemplate.setHashValueSerializer(jackson2JsonRedisSerializer);
         objectRedisTemplate.setEnableTransactionSupport(true);
