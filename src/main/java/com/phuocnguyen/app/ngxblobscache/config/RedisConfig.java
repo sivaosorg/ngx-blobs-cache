@@ -6,7 +6,12 @@ import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sivaos.Utils.LoggerUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.data.redis.RedisProperties;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -22,6 +27,7 @@ import org.springframework.data.redis.serializer.RedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 import redis.clients.jedis.JedisPoolConfig;
 
+import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 import java.time.Duration;
 
@@ -37,23 +43,45 @@ import java.time.Duration;
 @EnableRedisRepositories
 public class RedisConfig {
 
-    @Value("${spring.redis.host}")
+    private static final Logger logger = LoggerFactory.getLogger(RedisConfig.class);
+
+    @Autowired
+    private RedisProperties redisProperties;
+
+    @Value("${spring.redis.host:localhost}")
     private String HOST;
 
-    @Value("${spring.redis.password}")
+    @Value("${spring.redis.password:123456}")
     private String PASSWORD;
 
-    @Value("${spring.redis.port}")
+    @Value("${spring.redis.port:6397}")
     private int PORT;
+
+    @Value("${spring.redis.jedis.pool.max-active:100}")
+    private int MAX_ACTIVE;
+
+    @Value("${spring.redis.jedis.pool.max-idle:100}")
+    private int MAX_IDLE;
+
+    @Value("${spring.redis.jedis.pool.min-idle:10}")
+    private int MIN_IDLE;
+
+
+    @PostConstruct
+    private void initializeProps() {
+        if (logger.isInfoEnabled()) {
+            logger.info("redisProperties- {}", LoggerUtils.toJson(redisProperties));
+        }
+    }
 
     /* 1. start#Popularity */
     @Bean
     public JedisPoolConfig poolConfig() {
         final JedisPoolConfig jedisPoolConfig = new JedisPoolConfig();
         jedisPoolConfig.setTestOnBorrow(true);
-        jedisPoolConfig.setMaxTotal(100);
-        jedisPoolConfig.setMaxIdle(100);
-        jedisPoolConfig.setMinIdle(10);
+        jedisPoolConfig.setMaxTotal(redisProperties.getJedis().getPool().getMaxActive());
+        jedisPoolConfig.setMaxIdle(redisProperties.getJedis().getPool().getMaxIdle());
+        jedisPoolConfig.setMinIdle(redisProperties.getJedis().getPool().getMinIdle());
         jedisPoolConfig.setTestOnReturn(true);
         jedisPoolConfig.setTestWhileIdle(true);
         jedisPoolConfig.setMinEvictableIdleTimeMillis(Duration.ofSeconds(60).toMillis());
@@ -66,9 +94,9 @@ public class RedisConfig {
     @Bean
     public RedisStandaloneConfiguration redisStandaloneConfiguration() {
         RedisStandaloneConfiguration configuration = new RedisStandaloneConfiguration();
-        configuration.setHostName(HOST);
-        configuration.setPort(PORT);
-        configuration.setPassword(RedisPassword.of(PASSWORD));
+        configuration.setHostName(redisProperties.getHost());
+        configuration.setPort(redisProperties.getPort());
+        configuration.setPassword(RedisPassword.of(redisProperties.getPassword()));
         return configuration;
     }
 
