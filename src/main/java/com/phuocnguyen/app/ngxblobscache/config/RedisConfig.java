@@ -7,6 +7,7 @@ import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sivaos.Utils.LoggerUtils;
+import com.sivaos.config.propertiesConfig.RedisPubSubProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -48,6 +49,9 @@ public class RedisConfig {
     @Autowired
     private RedisProperties redisProperties;
 
+    @Autowired
+    private RedisPubSubProperties redisPubSubProperties;
+
     @Value("${spring.redis.host:localhost}")
     private String HOST;
 
@@ -71,6 +75,7 @@ public class RedisConfig {
     private void initializeProps() {
         if (logger.isInfoEnabled()) {
             logger.info("redisProperties- {}", LoggerUtils.toJson(redisProperties));
+            logger.info("redisPubSubProperties- {}", LoggerUtils.toJson(redisPubSubProperties));
         }
     }
 
@@ -110,7 +115,8 @@ public class RedisConfig {
 
     @Bean
     public LettuceConnectionFactory jeDisConnectionFactory() {
-        LettuceConnectionFactory lettuceConnectionFactory = new LettuceConnectionFactory(redisStandaloneConfiguration(), lettucePoolingClientConfiguration());
+        LettuceConnectionFactory lettuceConnectionFactory = new LettuceConnectionFactory(
+                redisStandaloneConfiguration(), lettucePoolingClientConfiguration());
         lettuceConnectionFactory.setShareNativeConnection(true);
         return lettuceConnectionFactory;
     }
