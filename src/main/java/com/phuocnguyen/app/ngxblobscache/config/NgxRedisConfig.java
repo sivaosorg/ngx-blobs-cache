@@ -42,9 +42,9 @@ import java.time.Duration;
 @Configuration
 @EnableCaching
 @EnableRedisRepositories
-public class RedisConfig {
+public class NgxRedisConfig {
 
-    private static final Logger logger = LoggerFactory.getLogger(RedisConfig.class);
+    private static final Logger logger = LoggerFactory.getLogger(NgxRedisConfig.class);
 
     @Autowired
     private RedisProperties redisProperties;
