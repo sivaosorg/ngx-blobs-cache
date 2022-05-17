@@ -33,7 +33,6 @@ import org.springframework.data.redis.repository.configuration.EnableRedisReposi
 import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
-import org.springframework.integration.redis.util.RedisLockRegistry;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPoolConfig;
@@ -232,9 +231,11 @@ public class NgxRedisConfig {
     /* 4. end#JedisClient */
 
     /* 5. start#Locks */
+    /*
     @Bean
     public RedisLockRegistry redisLockRegistry() {
         return new RedisLockRegistry(jeDisConnectionFactory(), "redis_locks", 6000L);
     }
+    */
     /* 5. end#Locks */
 }
