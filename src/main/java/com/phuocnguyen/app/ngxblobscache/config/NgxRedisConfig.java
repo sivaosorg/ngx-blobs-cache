@@ -7,15 +7,22 @@ import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sivaos.Utils.LoggerUtils;
+import com.sivaos.Utils.ObjectUtils;
 import com.sivaos.config.propertiesConfig.RedisPubSubProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.data.redis.RedisProperties;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.cache.RedisCacheConfiguration;
+import org.springframework.data.redis.cache.RedisCacheManager;
+import org.springframework.data.redis.cache.RedisCacheWriter;
 import org.springframework.data.redis.connection.RedisPassword;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
@@ -26,6 +33,9 @@ import org.springframework.data.redis.repository.configuration.EnableRedisReposi
 import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
+import org.springframework.integration.redis.util.RedisLockRegistry;
+import redis.clients.jedis.Jedis;
+import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPoolConfig;
 
 import javax.annotation.PostConstruct;
@@ -36,6 +46,8 @@ import java.time.Duration;
  * compile group: 'org.springframework.data', name: 'spring-data-redis', version: '2.3.4.RELEASE'
  * compile group: 'redis.clients', name: 'jedis', version: '3.1.0'
  * implementation group: 'io.lettuce', name: 'lettuce-core', version: '5.1.7.RELEASE'
+ * implementation group: 'org.springframework.integration', name: 'spring-integration-redis', version: '5.5.11'
+ * implementation group: 'org.springframework.boot', name: 'spring-boot-starter-integration', version: '2.6.7'
  * */
 
 @SuppressWarnings("All")
@@ -81,6 +93,7 @@ public class NgxRedisConfig {
 
     /* 1. start#Popularity */
     @Bean
+    @ConditionalOnMissingBean(name = "poolConfig")
     public JedisPoolConfig poolConfig() {
         final JedisPoolConfig jedisPoolConfig = new JedisPoolConfig();
         jedisPoolConfig.setTestOnBorrow(true);
@@ -94,6 +107,17 @@ public class NgxRedisConfig {
         jedisPoolConfig.setNumTestsPerEvictionRun(3);
         jedisPoolConfig.setBlockWhenExhausted(true);
         return jedisPoolConfig;
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(name = "jedisPool")
+    public JedisPool jedisPool(JedisPoolConfig poolConfig) {
+        return new JedisPool(poolConfig,
+                redisProperties.getHost(),
+                redisProperties.getPort(),
+                ObjectUtils.allNotNull(redisProperties.getTimeout()) ?
+                        redisProperties.getTimeout().getNano() : 20000,
+                redisProperties.getPassword());
     }
 
     @Bean
@@ -121,30 +145,42 @@ public class NgxRedisConfig {
         return lettuceConnectionFactory;
     }
 
-    @Bean
-    public RedisTemplate<String, Object> redisTemplate() {
+    private Jackson2JsonRedisSerializer<Object> jackson2JsonRedisSerializer() {
         Jackson2JsonRedisSerializer<Object> jackson2JsonRedisSerializer = new Jackson2JsonRedisSerializer<>(Object.class);
-        RedisTemplate<String, Object> objectRedisTemplate = new RedisTemplate<>();
-        RedisSerializer<String> stringSerializer = new StringRedisSerializer();
 
         JsonFactory jsonFactory = new JsonFactory();
         jsonFactory.enable(JsonParser.Feature.ALLOW_SINGLE_QUOTES);
-        ObjectMapper mapper = new ObjectMapper(jsonFactory);
 
-        objectRedisTemplate.setConnectionFactory(jeDisConnectionFactory());
-        objectRedisTemplate.setKeySerializer(stringSerializer);
-        objectRedisTemplate.setHashKeySerializer(stringSerializer);
+        ObjectMapper mapper = new ObjectMapper(jsonFactory);
 
         mapper.setVisibility(PropertyAccessor.ALL, JsonAutoDetect.Visibility.ANY);
         mapper.enableDefaultTyping(ObjectMapper.DefaultTyping.NON_FINAL);
         mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 
         jackson2JsonRedisSerializer.setObjectMapper(mapper);
-        objectRedisTemplate.setValueSerializer(jackson2JsonRedisSerializer);
-        objectRedisTemplate.setHashValueSerializer(jackson2JsonRedisSerializer);
-        objectRedisTemplate.setEnableTransactionSupport(true);
-        objectRedisTemplate.afterPropertiesSet();
-        return objectRedisTemplate;
+        return jackson2JsonRedisSerializer;
+    }
+
+    private RedisSerializer<String> redisSerializer() {
+        return new StringRedisSerializer();
+    }
+
+    @Bean
+    public RedisTemplate<String, Object> redisTemplate() {
+        Jackson2JsonRedisSerializer<Object> jackson2JsonRedisSerializer = this.jackson2JsonRedisSerializer();
+        RedisSerializer<String> serializer = this.redisSerializer();
+        RedisTemplate<String, Object> template = new RedisTemplate<>();
+
+        template.setConnectionFactory(jeDisConnectionFactory());
+        template.setKeySerializer(serializer);
+        template.setValueSerializer(jackson2JsonRedisSerializer);
+
+        template.setHashKeySerializer(serializer);
+        template.setHashValueSerializer(jackson2JsonRedisSerializer);
+
+        template.setEnableTransactionSupport(true);
+        template.afterPropertiesSet();
+        return template;
     }
     /* 1. end#Popularity */
 
@@ -156,11 +192,49 @@ public class NgxRedisConfig {
     /* 2. start#Advenced */
     @Bean
     public StringRedisTemplate stringRedisTemplate() {
+        Jackson2JsonRedisSerializer<Object> jackson2JsonRedisSerializer = this.jackson2JsonRedisSerializer();
         LettuceConnectionFactory redisConnectionFactory = jeDisConnectionFactory();
-        StringRedisTemplate stringRedisTemplate = new StringRedisTemplate(redisConnectionFactory);
-        stringRedisTemplate.setEnableTransactionSupport(true);
-        stringRedisTemplate.afterPropertiesSet();
-        return stringRedisTemplate;
+        RedisSerializer<String> serializer = this.redisSerializer();
+
+        StringRedisTemplate template = new StringRedisTemplate(redisConnectionFactory);
+
+        template.setKeySerializer(serializer);
+        template.setValueSerializer(jackson2JsonRedisSerializer);
+
+        template.setHashKeySerializer(serializer);
+        template.setHashValueSerializer(jackson2JsonRedisSerializer);
+
+        template.setEnableTransactionSupport(true);
+        template.afterPropertiesSet();
+        return template;
     }
     /* 2. end#Advenced */
+
+
+    /* 3. start#CacheManager */
+    @Bean
+    public CacheManager cacheManager() {
+        RedisCacheConfiguration redisCacheConfiguration = RedisCacheConfiguration.defaultCacheConfig();
+        LettuceConnectionFactory redisConnectionFactory = jeDisConnectionFactory();
+
+        return RedisCacheManager.builder(
+                RedisCacheWriter.nonLockingRedisCacheWriter(redisConnectionFactory))
+                .cacheDefaults(redisCacheConfiguration)
+                .build();
+    }
+    /* 3. end#CacheManager */
+
+    /* 4. start#JedisClient */
+    @Bean
+    public Jedis jedis(@Qualifier("jedisPool") JedisPool jedisPool) {
+        return jedisPool.getResource();
+    }
+    /* 4. end#JedisClient */
+
+    /* 5. start#Locks */
+    @Bean
+    public RedisLockRegistry redisLockRegistry() {
+        return new RedisLockRegistry(jeDisConnectionFactory(), "redis_locks", 6000L);
+    }
+    /* 5. end#Locks */
 }

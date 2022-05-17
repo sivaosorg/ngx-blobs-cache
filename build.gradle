@@ -99,6 +99,8 @@ dependencies {
 
 
     /* begin::Cache */
+    implementation group: 'org.springframework.boot', name: 'spring-boot-starter-integration', version: '2.6.7'
+    implementation group: 'org.springframework.integration', name: 'spring-integration-redis', version: '5.5.11'
     compile group: 'org.springframework.data', name: 'spring-data-redis', version: '2.3.4.RELEASE'
     compile group: 'redis.clients', name: 'jedis', version: '3.1.0'
     implementation group: 'io.lettuce', name: 'lettuce-core', version: '5.1.7.RELEASE'
@@ -178,8 +180,6 @@ dependencies {
     /* begin::Support SMS */
     implementation group: 'com.plivo', name: 'plivo-java', version: '5.3.1'
     runtime group: 'com.twilio.sdk', name: 'twilio', version: '7.11.0'
-    // runtimeOnly group: 'com.twilio.sdk', name: 'twilio', version: '8.19.2'
-    // runtimeOnly 'com.twilio.sdk:twilio:8.19.2'
     /* begin::Support SMS */
 
     /*
