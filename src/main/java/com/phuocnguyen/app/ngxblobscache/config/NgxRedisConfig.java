@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.data.redis.RedisProperties;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
@@ -225,6 +226,11 @@ public class NgxRedisConfig {
 
     /* 4. start#JedisClient */
     @Bean
+    @ConditionalOnProperty(
+            value = "spring.redis.jedis-starter.enabled",
+            havingValue = "true",
+            matchIfMissing = false
+    )
     public Jedis jedis(@Qualifier("jedisPool") JedisPool jedisPool) {
         return jedisPool.getResource();
     }

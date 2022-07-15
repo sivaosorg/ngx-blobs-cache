@@ -1,5 +1,6 @@
 package com.phuocnguyen.app.ngxblobscache.config;
 
+import com.ngxsivaos.model.properties.JedisPoolProperties;
 import com.phuocnguyen.app.ngxblobssrv.service.NgxRedisBaseService;
 import com.phuocnguyen.app.ngxblobssrv.service.NgxRedisStylesBaseService;
 import com.phuocnguyen.app.ngxblobssrv.service.serviceImpl.NgxRedisBaseServiceImpl;
@@ -38,5 +39,11 @@ public class ServicesCachesGlobalConfig {
     @Primary
     public RedisPubSubProperties redisPubSubProperties() {
         return new RedisPubSubProperties();
+    }
+
+    @Bean
+    @Primary
+    public JedisPoolProperties jedisPoolProperties() {
+        return new JedisPoolProperties();
     }
 }
